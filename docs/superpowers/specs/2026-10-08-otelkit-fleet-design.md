@@ -44,7 +44,7 @@ component validation is delegated to the user's own Collector binary.
 | Package | Responsibility |
 |---|---|
 | `internal/model` | Parse raw YAML into a normalized Collector config: components keyed by kind (`receivers`, `processors`, `exporters`, `connectors`, `extensions`) and ID (`type[/name]`); `service.pipelines` as ordered lists of IDs; `${...}` placeholders kept verbatim; source file + line tracked per value. |
-| `internal/source` | Load configs into named targets. `file` (path or glob; target name = file base name) and `k8s` (`k8s://<context>/<namespace>/configmap/<name>[#key]` or `k8s://<context>/<namespace>/otelcol/<name>` reading CR `spec.config`; default ConfigMap key `config.yaml`). |
+| `internal/source` | Load configs into named targets. `file` (path or glob; target name = file base name) and `k8s` (`k8s://<context>/<namespace>/configmap/<name>[#key]` or `k8s://<context>/<namespace>/otelcol/<name>` reading CR `spec.config`, `opentelemetry.io/v1beta1`). The URL is parsed from the right so contexts containing `/` (EKS ARNs) work. Default ConfigMap key: `config.yaml`, else `relay` (the Helm chart's key), else the only key. Colliding file base names (many `config.yaml`) fall back to the path with `/` replaced by `-`. |
 | `internal/diff` | Flatten a model into `path → value` and compute semantic differences (added / removed / changed). Shared by `analyze`, `build --check` and `diff`. |
 | `internal/analyze` | Base computation, per-target deviations, majority-based drift rules, `--emit-fleet`. |
 | `internal/build` | Read `fleet.yaml`, merge layers, substitute vars, run post-merge checks, write output. |
@@ -88,7 +88,7 @@ targets:
 ```
 
 - `deployed` is optional; `k8s` accepts either `configmap` (+ optional `key`)
-  or `otelcol` (CR name). Used only by `diff` / `build --check`.
+  or `otelcol` (CR name). Used only by `diff`.
 - Output path defaults to `out/<target>.yaml`.
 - Paths in `fleet.yaml` are relative to `fleet.yaml`.
 
@@ -103,7 +103,9 @@ Layer order: base → fragments (listed order) → overrides.
 3. Pipeline `receivers`/`processors`/`exporters` lists append in layer order,
    de-duplicated, first occurrence keeps its position.
 4. An override list tagged `!replace` replaces the merged list.
-5. A value of `null` deletes that key (JSON merge-patch semantics).
+5. In an **override**, a value of `null` deletes that key (JSON merge-patch
+   semantics). In base and fragments `null` keeps its Collector meaning (a
+   component with default settings, e.g. `batch:`) and never deletes.
 6. `${var:name}` is substituted from the target's `vars`; an unknown var is an
    error. `${env:...}` and `${file:...}` pass through unchanged.
 
