@@ -2,6 +2,7 @@ package model
 
 import (
 	"slices"
+	"strings"
 	"testing"
 
 	"go.yaml.in/yaml/v3"
@@ -94,5 +95,23 @@ service:
 	p := Pipelines(root)["traces"]
 	if !slices.Equal(p.Processors, []string{"memory_limiter", "batch"}) || !slices.Equal(p.Exporters, []string{"otlp", "debug"}) {
 		t.Errorf("got %+v", p)
+	}
+}
+
+func TestParseRejectsAliasBomb(t *testing.T) {
+	in := "a: &a [x, x, x, x, x, x, x, x, x, x]\n"
+	prev := "a"
+	for _, n := range []string{"b", "c", "d", "e", "f", "g", "h", "i"} {
+		in += n + ": &" + n + " [" + strings.Repeat("*"+prev+", ", 9) + "*" + prev + "]\n"
+		prev = n
+	}
+	if _, err := Parse([]byte(in)); err == nil || !strings.Contains(err.Error(), "too many") {
+		t.Fatalf("want expansion limit error, got %v", err)
+	}
+}
+
+func TestParseRejectsSelfReferencingAlias(t *testing.T) {
+	if _, err := Parse([]byte("a: &a\n  b: *a\n")); err == nil {
+		t.Fatal("want error for an alias inside its own anchor")
 	}
 }

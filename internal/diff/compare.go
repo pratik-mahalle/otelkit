@@ -33,11 +33,16 @@ func Compare(a, b Flat) []Change {
 	return out
 }
 
-var secretKey = regexp.MustCompile(`(?i)token|password|secret|key|authorization|api[-_]?key|headers`)
+var (
+	secretKey   = regexp.MustCompile(`(?i)token|password|secret|key|authorization|api[-_]?key|headers`)
+	placeholder = regexp.MustCompile(`^\$\{[^}]*\}$`)
+)
 
-// Mask hides values whose path looks like a credential. Placeholders are kept: they hold no secret.
+// Mask hides values whose path looks like a credential. A value that is only a placeholder is
+// kept: it holds no secret. ponytail: secrets under other key names (e.g. a password inside an
+// endpoint URL) are not detected; extend secretKey if that shows up.
 func Mask(path, text string) string {
-	if text == Present || strings.Contains(text, "${") || !secretKey.MatchString(path) {
+	if text == Present || placeholder.MatchString(text) || !secretKey.MatchString(path) {
 		return text
 	}
 	return "****"

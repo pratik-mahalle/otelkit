@@ -26,27 +26,55 @@ func Parse(data []byte) (*yaml.Node, error) {
 	if root.Kind != yaml.MappingNode {
 		return nil, fmt.Errorf("line %d: top level must be a mapping", root.Line)
 	}
-	return expand(root), nil
+	e := expander{active: map[*yaml.Node]bool{}}
+	out := e.expand(root)
+	return out, e.err
+}
+
+// maxNodes bounds alias expansion so a "billion laughs" document cannot exhaust memory.
+const maxNodes = 1_000_000
+
+type expander struct {
+	active map[*yaml.Node]bool // anchors being expanded, to catch self-reference
+	nodes  int
+	err    error
 }
 
 // expand returns a copy of n with aliases replaced by copies of their targets and merge
 // keys folded into their parent mapping; explicit keys win over merged ones.
-func expand(n *yaml.Node) *yaml.Node {
+func (e *expander) expand(n *yaml.Node) *yaml.Node {
+	if e.err != nil {
+		return n
+	}
+	if e.nodes++; e.nodes > maxNodes {
+		e.err = fmt.Errorf("too many nodes after expanding aliases (limit %d)", maxNodes)
+		return n
+	}
 	if n.Kind == yaml.AliasNode {
-		return expand(n.Alias)
+		if e.active[n.Alias] {
+			e.err = fmt.Errorf("line %d: alias *%s refers to itself", n.Line, n.Value)
+			return n
+		}
+		e.active[n.Alias] = true
+		defer delete(e.active, n.Alias)
+		return e.expand(n.Alias)
+	}
+	if n.Anchor != "" {
+		e.active[n] = true
+		defer delete(e.active, n)
 	}
 	c := *n
 	c.Anchor = "" // copies of an anchored node must not repeat the anchor
 	c.Content = nil
 	if n.Kind != yaml.MappingNode {
 		for _, ch := range n.Content {
-			c.Content = append(c.Content, expand(ch))
+			c.Content = append(c.Content, e.expand(ch))
 		}
 		return &c
 	}
 	var merged []*yaml.Node
 	for i := 0; i+1 < len(n.Content); i += 2 {
-		k, v := n.Content[i], expand(n.Content[i+1])
+		k, v := n.Content[i], e.expand(n.Content[i+1])
 		if k.Kind == yaml.ScalarNode && k.ShortTag() == "!!merge" {
 			merged = append(merged, v)
 			continue

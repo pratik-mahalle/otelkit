@@ -95,3 +95,9 @@ func TestMatch(t *testing.T) {
 		t.Error("glob must anchor at the end")
 	}
 }
+
+func TestMaskPlaceholderMixedWithLiteral(t *testing.T) {
+	if got := Mask("exporters.otlp.headers.authorization", "Bearer sk-live-123 ${env:X}"); got != "****" {
+		t.Errorf("literal next to a placeholder must be masked, got %q", got)
+	}
+}
