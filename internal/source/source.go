@@ -100,6 +100,12 @@ func (l Loader) Load(ctx context.Context, args []string) ([]Target, []error) {
 			continue
 		}
 		for _, p := range ps {
+			if abs, err := filepath.Abs(p); err == nil && slices.ContainsFunc(paths, func(q string) bool {
+				qa, _ := filepath.Abs(q)
+				return qa == abs
+			}) {
+				continue // the same file given twice, e.g. via a directory and a glob
+			}
 			paths, pathArgs = append(paths, p), append(pathArgs, a)
 		}
 	}
@@ -117,7 +123,22 @@ func (l Loader) Load(ctx context.Context, args []string) ([]Target, []error) {
 		}
 		targets = append(targets, Target{Name: names[i], Source: pathArgs[i], Root: root, Deployed: Deployed{File: abs}})
 	}
-	return targets, errs
+	return unique(targets, errs)
+}
+
+// unique drops targets whose name is already taken, reporting each, so no config is silently merged into another.
+func unique(targets []Target, errs []error) ([]Target, []error) {
+	first := map[string]Target{}
+	var out []Target
+	for _, t := range targets {
+		if f, ok := first[t.Name]; ok {
+			errs = append(errs, fmt.Errorf("%s: target name %q is already used by %s; rename one of them", t.Source, t.Name, f.Source))
+			continue
+		}
+		first[t.Name] = t
+		out = append(out, t)
+	}
+	return out, errs
 }
 
 // FromDeployed loads the config a fleet target says is deployed. Relative files resolve against dir.

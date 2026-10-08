@@ -107,3 +107,29 @@ func TestMaskPlaceholderWithDefault(t *testing.T) {
 		t.Errorf("a placeholder's default value can hold a secret, got %q", got)
 	}
 }
+
+func TestFlattenDeepNullDiffersFromAbsent(t *testing.T) {
+	a := flat(t, "receivers:\n  otlp:\n    protocols:\n      grpc:\n      http:\n")
+	b := flat(t, "receivers:\n  otlp:\n    protocols:\n      grpc:\n")
+	if ch := Compare(a, b); len(ch) != 1 || ch[0].Path != "receivers.otlp.protocols.http" {
+		t.Errorf("a null key must still count as present, got %+v", ch)
+	}
+	if ch := Compare(b, flat(t, "receivers:\n  otlp:\n    protocols:\n      grpc: {}\n")); len(ch) != 0 {
+		t.Errorf("grpc: and grpc: {} must be equal, got %+v", ch)
+	}
+}
+
+func TestMaskCommonSecretShapes(t *testing.T) {
+	cases := [][2]string{
+		{"extensions.basicauth/server.htpasswd.inline", "admin:SuperSecretPw"},
+		{"exporters.azuremonitor.connection_string", "InstrumentationKey=abc"},
+		{"exporters.sentry.dsn", "https://key@sentry.io/1"},
+		{"receivers.sqlquery.datasource", "host=db password=x"},
+		{"exporters.otlphttp.endpoint", "https://user:pass@collector:4318"},
+	}
+	for _, c := range cases {
+		if got := Mask(c[0], c[1]); got != "****" {
+			t.Errorf("Mask(%s) = %q, want ****", c[0], got)
+		}
+	}
+}

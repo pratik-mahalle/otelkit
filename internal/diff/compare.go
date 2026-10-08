@@ -34,18 +34,22 @@ func Compare(a, b Flat) []Change {
 }
 
 var (
-	secretKey   = regexp.MustCompile(`(?i)token|password|secret|key|authorization|api[-_]?key|headers`)
+	secretKey   = regexp.MustCompile(`(?i)token|password|secret|key|authorization|api[-_]?key|headers|inline|connection_string|dsn|datasource|credential`)
+	urlUserinfo = regexp.MustCompile(`://[^/\s@:]+:[^/\s@]+@`)
 	placeholder = regexp.MustCompile(`^\$\{(env|file):[^}:]*\}$`) // no ":-default", which could hold a secret
 )
 
 // Mask hides values whose path looks like a credential. A value that is only a placeholder is
-// kept: it holds no secret. ponytail: secrets under other key names (e.g. a password inside an
-// endpoint URL) are not detected; extend secretKey if that shows up.
+// kept: it holds no secret. ponytail: secrets under key names not in secretKey are not detected;
+// extend it when one shows up.
 func Mask(path, text string) string {
-	if text == Present || placeholder.MatchString(text) || !secretKey.MatchString(path) {
+	if text == Present || placeholder.MatchString(text) {
 		return text
 	}
-	return "****"
+	if secretKey.MatchString(path) || urlUserinfo.MatchString(text) {
+		return "****"
+	}
+	return text
 }
 
 // Match reports whether path matches glob, where * matches any characters including dots.

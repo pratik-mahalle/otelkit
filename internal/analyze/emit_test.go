@@ -56,3 +56,15 @@ func TestEmitRefusesNonEmptyDir(t *testing.T) {
 		t.Fatal("must refuse to write into a non-empty dir")
 	}
 }
+
+func TestEmitRejectsDuplicateNames(t *testing.T) {
+	ts := emitTargets(t)
+	ts[1].Name = ts[0].Name
+	dir := filepath.Join(t.TempDir(), "fleet")
+	if err := Emit(dir, ts); err == nil {
+		t.Fatal("duplicate target names would silently drop a config")
+	}
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Error("nothing may be written on failure")
+	}
+}

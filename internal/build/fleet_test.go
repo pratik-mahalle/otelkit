@@ -154,3 +154,26 @@ func TestLoadRejectsOtelcolPath(t *testing.T) {
 		}
 	}
 }
+
+func TestLoadRejectsInterpreterAsOtelcol(t *testing.T) {
+	dir := t.TempDir()
+	for _, bin := range []string{"sh", "bash", "python3"} {
+		os.WriteFile(filepath.Join(dir, "fleet.yaml"), []byte("otelcol: "+bin+"\nbase: base.yaml\n"), 0o644)
+		if _, err := Load(filepath.Join(dir, "fleet.yaml")); err == nil {
+			t.Errorf("otelcol %q must be rejected: it would run a repo file named validate", bin)
+		}
+	}
+	os.WriteFile(filepath.Join(dir, "fleet.yaml"), []byte("otelcol: splunk-otel-collector\nbase: base.yaml\n"), 0o644)
+	if _, err := Load(filepath.Join(dir, "fleet.yaml")); err != nil {
+		t.Errorf("vendor collector name must be allowed: %v", err)
+	}
+}
+
+func TestRunOutputIsWorldReadable(t *testing.T) {
+	f := copyFleet(t, "basic")
+	Run(f, Options{})
+	info, err := os.Stat(f.OutputPath("vm-a"))
+	if err != nil || info.Mode().Perm() != 0o644 {
+		t.Fatalf("mode = %v, err = %v; the Collector's service user must be able to read it", info.Mode().Perm(), err)
+	}
+}

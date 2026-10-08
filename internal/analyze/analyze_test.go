@@ -133,3 +133,12 @@ func TestWriteText(t *testing.T) {
 		t.Error("HasDrift")
 	}
 }
+
+func TestBaseIgnoresCommentsInListsOfMaps(t *testing.T) {
+	plain := "processors:\n  attributes:\n    actions:\n      - {key: a, value: 1, action: insert}\n"
+	commented := "processors:\n  attributes:\n    actions:\n      - {key: \"a\", value: 1, action: insert} # why\n"
+	g := Analyze([]GroupInput{{Name: "all", Targets: []Target{target(t, "a", plain), target(t, "b", plain), target(t, "c", commented)}}}, Options{}).Groups[0]
+	if g.Shared != 1 || len(g.Deviations) != 0 {
+		t.Errorf("a comment or quoting difference must not split the base: shared=%v deviations=%v", g.Shared, g.Deviations)
+	}
+}

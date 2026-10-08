@@ -80,6 +80,9 @@ func (m merger) merge(dst, src *yaml.Node, path []string, l Layer) error {
 			m.mark(p, l, val)
 		default:
 			if same(cur, val) {
+				if l.Kind == Fragment && m.origins[diff.Join(p)].kind != Fragment {
+					m.mark(p, l, val) // a fragment restating the base still claims the value
+				}
 				continue
 			}
 			if o := m.origins[diff.Join(p)]; l.Kind == Fragment && o.kind == Fragment {

@@ -98,6 +98,11 @@ func Base(targets []Target) *yaml.Node {
 func Intersect(path []string, a, b *yaml.Node) *yaml.Node {
 	am, bm := asMap(a), asMap(b)
 	if am != nil && bm != nil {
+		// below component level an empty key and a populated one are different values
+		component := len(path) == 2 && slices.Contains(model.Kinds, path[0])
+		if len(path) > 0 && !component && (len(am.Content) == 0) != (len(bm.Content) == 0) {
+			return nil
+		}
 		out := model.NewMap()
 		for i := 0; i+1 < len(am.Content); i += 2 {
 			k := am.Content[i]

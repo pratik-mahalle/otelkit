@@ -35,8 +35,11 @@ func walk(f Flat, path []string, n *yaml.Node) {
 		f[Join(path)] = Value{Text: Present, Line: n.Line}
 	}
 	switch {
-	case model.IsNull(n):
-		// null and {} add nothing beyond presence
+	case model.IsNull(n) || (n.Kind == yaml.MappingNode && len(n.Content) == 0):
+		// null and {} are the same; below component level the key itself still counts
+		if len(path) > 0 && !(len(path) == 2 && slices.Contains(model.Kinds, path[0])) {
+			f[Join(path)] = Value{Text: "{}", Line: n.Line}
+		}
 	case n.Kind == yaml.MappingNode:
 		for i := 0; i+1 < len(n.Content); i += 2 {
 			walk(f, append(path[:len(path):len(path)], n.Content[i].Value), n.Content[i+1])
@@ -62,9 +65,26 @@ func Text(path []string, n *yaml.Node) string {
 		}
 		return "[" + strings.Join(items, ", ") + "]"
 	default:
-		b, _ := model.Marshal(n)
+		b, _ := model.Marshal(canonical(n))
 		return string(b)
 	}
+}
+
+// canonical copies n without comments or quoting style, so only values are compared.
+func canonical(n *yaml.Node) *yaml.Node {
+	c := model.Clone(n)
+	var reset func(*yaml.Node)
+	reset = func(x *yaml.Node) {
+		x.Style, x.HeadComment, x.LineComment, x.FootComment = 0, "", "", ""
+		if x.Kind == yaml.ScalarNode && x.Tag == "!!str" {
+			x.Tag = ""
+		}
+		for _, ch := range x.Content {
+			reset(ch)
+		}
+	}
+	reset(c)
+	return c
 }
 
 func hasCollections(seq *yaml.Node) bool {

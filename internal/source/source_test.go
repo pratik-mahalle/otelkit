@@ -149,3 +149,31 @@ func TestFromDeployedRelativeFile(t *testing.T) {
 		t.Fatalf("root=%v err=%v", root, err)
 	}
 }
+
+func TestLoadRejectsDuplicateNames(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "vm1", "config.yaml"), "{}\n")
+	writeFile(t, filepath.Join(dir, "vm1", "config.yml"), "{}\n")
+	writeFile(t, filepath.Join(dir, "x", "vm1-config.yaml"), "{}\n")
+	t.Chdir(dir)
+	ts, errs := Loader{}.Load(context.Background(), []string{"vm1/config.yaml", "vm1/config.yml", "x/vm1-config.yaml"})
+	seen := map[string]bool{}
+	for _, tg := range ts {
+		if seen[tg.Name] {
+			t.Fatalf("duplicate target name %q", tg.Name)
+		}
+		seen[tg.Name] = true
+	}
+	if len(ts)+len(errs) != 3 || len(errs) == 0 {
+		t.Errorf("every colliding config must be loaded or reported: targets=%v errs=%v", names(ts), errs)
+	}
+}
+
+func TestLoadSameFileTwiceIsOneTarget(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "a.yaml"), "{}\n")
+	ts, errs := Loader{}.Load(context.Background(), []string{dir, filepath.Join(dir, "a.yaml")})
+	if len(ts) != 1 || len(errs) != 0 {
+		t.Errorf("targets=%v errs=%v", names(ts), errs)
+	}
+}

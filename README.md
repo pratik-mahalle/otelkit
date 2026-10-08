@@ -37,7 +37,7 @@ Merge rules: maps deep-merge; pipeline receiver/processor/exporter lists append;
 setting the same value differently is an error; in overrides `null` deletes a key and `!replace`
 replaces a list; `${var:name}` comes from the target's `vars`; `${env:...}`/`${file:...}` are left for the Collector.
 
-`otelcol:` in `fleet.yaml` may only name a command on PATH; pass a binary path with `--otelcol`
+`otelcol:` in `fleet.yaml` may only name a collector command on PATH (its name must contain `otel`); pass a binary path with `--otelcol`
 (so a change to `fleet.yaml` can never make CI execute a script from the repo).
 
 Flags go before sources. Design: `docs/superpowers/specs/2026-10-08-otelkit-fleet-design.md`.

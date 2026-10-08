@@ -157,3 +157,14 @@ func TestSubstituteUnknownVar(t *testing.T) {
 		t.Fatalf("got %v", err)
 	}
 }
+
+func TestMergeFragmentConflictWhenFirstMatchesBase(t *testing.T) {
+	_, err := Merge([]Layer{
+		layer(t, Base, "base.yaml", "processors:\n  batch:\n    timeout: 5s\n"),
+		layer(t, Fragment, "fragments/a.yaml", "processors:\n  batch:\n    timeout: 5s\n"),
+		layer(t, Fragment, "fragments/b.yaml", "processors:\n  batch:\n    timeout: 10s\n"),
+	})
+	if err == nil || !strings.Contains(err.Error(), "conflicts with fragments/a.yaml") {
+		t.Fatalf("two fragments disagree; want conflict, got %v", err)
+	}
+}

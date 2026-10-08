@@ -28,7 +28,12 @@ func Emit(dir string, targets []EmitTarget) error {
 		return fmt.Errorf("%s is not empty", dir)
 	}
 	ts := make([]Target, len(targets))
+	seen := map[string]bool{}
 	for i, t := range targets {
+		if seen[t.Name] {
+			return fmt.Errorf("two targets are named %q; nothing written", t.Name)
+		}
+		seen[t.Name] = true
 		ts[i] = Target{Name: t.Name, Root: t.Root}
 	}
 	base := Base(ts)
