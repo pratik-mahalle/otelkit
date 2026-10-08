@@ -3,7 +3,7 @@ package diff
 import (
 	"testing"
 
-	"github.com/pratikmahalle/otelkit/internal/model"
+	"github.com/pratik-mahalle/otelkit/internal/model"
 )
 
 func flat(t *testing.T, in string) Flat {

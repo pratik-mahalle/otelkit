@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/pratikmahalle/otelkit/internal/source"
+	"github.com/pratik-mahalle/otelkit/internal/source"
 )
 
 const usage = `usage: otelkit fleet <command> [flags] [args]

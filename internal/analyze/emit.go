@@ -7,10 +7,10 @@ import (
 
 	"go.yaml.in/yaml/v3"
 
-	"github.com/pratikmahalle/otelkit/internal/build"
-	"github.com/pratikmahalle/otelkit/internal/diff"
-	"github.com/pratikmahalle/otelkit/internal/model"
-	"github.com/pratikmahalle/otelkit/internal/source"
+	"github.com/pratik-mahalle/otelkit/internal/build"
+	"github.com/pratik-mahalle/otelkit/internal/diff"
+	"github.com/pratik-mahalle/otelkit/internal/model"
+	"github.com/pratik-mahalle/otelkit/internal/source"
 )
 
 // EmitTarget is a loaded config to turn into a fleet target.

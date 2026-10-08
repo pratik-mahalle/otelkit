@@ -3,7 +3,7 @@
 Keep OpenTelemetry Collector configs consistent across Kubernetes clusters and VMs.
 
 ```bash
-go install github.com/pratikmahalle/otelkit/cmd/otelkit@latest
+go install github.com/pratik-mahalle/otelkit/cmd/otelkit@latest
 ```
 
 ## 1. See how your configs drift

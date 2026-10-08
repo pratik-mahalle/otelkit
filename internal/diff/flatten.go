@@ -8,7 +8,7 @@ import (
 
 	"go.yaml.in/yaml/v3"
 
-	"github.com/pratikmahalle/otelkit/internal/model"
+	"github.com/pratik-mahalle/otelkit/internal/model"
 )
 
 // Present is the value of a component's presence entry.

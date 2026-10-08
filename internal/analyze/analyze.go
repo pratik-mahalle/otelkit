@@ -9,8 +9,8 @@ import (
 
 	"go.yaml.in/yaml/v3"
 
-	"github.com/pratikmahalle/otelkit/internal/diff"
-	"github.com/pratikmahalle/otelkit/internal/model"
+	"github.com/pratik-mahalle/otelkit/internal/diff"
+	"github.com/pratik-mahalle/otelkit/internal/model"
 )
 
 // Absent marks a path a target does not have.

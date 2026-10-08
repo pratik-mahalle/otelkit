@@ -17,7 +17,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 
-	"github.com/pratikmahalle/otelkit/internal/model"
+	"github.com/pratik-mahalle/otelkit/internal/model"
 )
 
 func writeFile(t *testing.T, path, content string) {

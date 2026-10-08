@@ -6,7 +6,7 @@ import (
 	"io"
 	"path/filepath"
 
-	"github.com/pratikmahalle/otelkit/internal/build"
+	"github.com/pratik-mahalle/otelkit/internal/build"
 )
 
 func runBuild(args []string, stdout, stderr io.Writer) int {

@@ -1,4 +1,4 @@
-module github.com/pratikmahalle/otelkit
+module github.com/pratik-mahalle/otelkit
 
 go 1.25.0
 

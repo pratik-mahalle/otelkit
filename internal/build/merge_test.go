@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/pratikmahalle/otelkit/internal/diff"
-	"github.com/pratikmahalle/otelkit/internal/model"
+	"github.com/pratik-mahalle/otelkit/internal/diff"
+	"github.com/pratik-mahalle/otelkit/internal/model"
 )
 
 func layer(t *testing.T, kind Kind, file, in string) Layer {

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/pratikmahalle/otelkit/internal/model"
+	"github.com/pratik-mahalle/otelkit/internal/model"
 )
 
 const cfgA = `

@@ -7,8 +7,8 @@ import (
 
 	"go.yaml.in/yaml/v3"
 
-	"github.com/pratikmahalle/otelkit/internal/diff"
-	"github.com/pratikmahalle/otelkit/internal/model"
+	"github.com/pratik-mahalle/otelkit/internal/diff"
+	"github.com/pratik-mahalle/otelkit/internal/model"
 )
 
 // Kind is a layer's role in the merge; it decides which overwrites are allowed.

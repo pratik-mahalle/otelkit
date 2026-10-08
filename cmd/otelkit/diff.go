@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/pratikmahalle/otelkit/internal/build"
-	"github.com/pratikmahalle/otelkit/internal/diff"
+	"github.com/pratik-mahalle/otelkit/internal/build"
+	"github.com/pratik-mahalle/otelkit/internal/diff"
 )
 
 type change struct {

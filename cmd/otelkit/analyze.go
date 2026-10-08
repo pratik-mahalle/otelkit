@@ -9,7 +9,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/pratikmahalle/otelkit/internal/analyze"
+	"github.com/pratik-mahalle/otelkit/internal/analyze"
 )
 
 func runAnalyze(args []string, stdout, stderr io.Writer) int {

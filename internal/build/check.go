@@ -6,8 +6,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/pratikmahalle/otelkit/internal/diff"
-	"github.com/pratikmahalle/otelkit/internal/model"
+	"github.com/pratik-mahalle/otelkit/internal/diff"
+	"github.com/pratik-mahalle/otelkit/internal/model"
 )
 
 // Check returns warnings for a merged config: processor order, undefined references and unused components.

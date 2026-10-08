@@ -12,9 +12,9 @@ import (
 
 	"go.yaml.in/yaml/v3"
 
-	"github.com/pratikmahalle/otelkit/internal/model"
-	"github.com/pratikmahalle/otelkit/internal/source"
-	"github.com/pratikmahalle/otelkit/internal/validate"
+	"github.com/pratik-mahalle/otelkit/internal/model"
+	"github.com/pratik-mahalle/otelkit/internal/source"
+	"github.com/pratik-mahalle/otelkit/internal/validate"
 )
 
 var collectorName = regexp.MustCompile(`(?i)^[a-z0-9._-]*otel[a-z0-9._-]*$`)

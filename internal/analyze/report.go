@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/pratikmahalle/otelkit/internal/diff"
+	"github.com/pratik-mahalle/otelkit/internal/diff"
 )
 
 // Line renders a drift finding in one line.
