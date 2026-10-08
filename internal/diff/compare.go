@@ -35,7 +35,7 @@ func Compare(a, b Flat) []Change {
 
 var (
 	secretKey   = regexp.MustCompile(`(?i)token|password|secret|key|authorization|api[-_]?key|headers`)
-	placeholder = regexp.MustCompile(`^\$\{[^}]*\}$`)
+	placeholder = regexp.MustCompile(`^\$\{(env|file):[^}:]*\}$`) // no ":-default", which could hold a secret
 )
 
 // Mask hides values whose path looks like a credential. A value that is only a placeholder is

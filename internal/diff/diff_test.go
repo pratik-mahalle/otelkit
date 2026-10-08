@@ -101,3 +101,9 @@ func TestMaskPlaceholderMixedWithLiteral(t *testing.T) {
 		t.Errorf("literal next to a placeholder must be masked, got %q", got)
 	}
 }
+
+func TestMaskPlaceholderWithDefault(t *testing.T) {
+	if got := Mask("exporters.otlp.headers.authorization", "${env:TOKEN:-sk-live-123}"); got != "****" {
+		t.Errorf("a placeholder's default value can hold a secret, got %q", got)
+	}
+}
