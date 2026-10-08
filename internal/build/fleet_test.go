@@ -103,7 +103,7 @@ func TestRunCheckDetectsStaleOutput(t *testing.T) {
 
 func TestRunFailuresAreIndependent(t *testing.T) {
 	f := copyFleet(t, "basic")
-	f.Targets["broken"] = TargetSpec{Fragments: []string{"missing"}}
+	f.Targets["broken"] = TargetSpec{Fragments: []string{"missing"}, Vars: map[string]string{"cluster": "x"}}
 	rs := Run(f, Options{})
 	if len(rs) != 3 || rs[0].Err == nil || !strings.Contains(rs[0].Err.Error(), "fragments/missing.yaml") ||
 		rs[1].Err != nil || rs[2].Err != nil {
