@@ -141,9 +141,10 @@ Output: text report (summary with target count and % of paths shared, base,
 drift, per-target deviations) or JSON. Exit 0, or 1 with `--fail-on-drift`
 when any drift is found.
 
-`--emit-fleet <dir>` writes `base.yaml` (the base), `overrides/<target>.yaml`
-(each target's deviations, using `null` for removed keys and `!replace` for
-lists that differ), and `fleet.yaml` (no fragments, no vars). Rendering that
+`--emit-fleet <dir>` writes `base.yaml` (the settings every target shares),
+`overrides/<target>.yaml` (what each target adds beyond the base), and
+`fleet.yaml` (no fragments, no vars, `deployed` set from where each config was
+loaded). It refuses a non-empty directory. Rendering that
 fleet must reproduce every input config with an empty semantic diff; analyze
 verifies this before writing and fails otherwise.
 
