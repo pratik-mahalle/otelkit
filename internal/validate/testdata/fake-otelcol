@@ -1,0 +1,12 @@
+#!/bin/sh
+# Fake otelcol for tests. Called as: fake-otelcol validate --config <file>
+config="$3"
+if grep -q INVALID "$config"; then
+  echo "invalid config: INVALID found" >&2
+  exit 1
+fi
+if grep -q OTELKIT_TEST_VAR "$config" && [ -z "$OTELKIT_TEST_VAR" ]; then
+  echo "OTELKIT_TEST_VAR is empty" >&2
+  exit 1
+fi
+exit 0
