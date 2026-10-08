@@ -1,0 +1,8 @@
+processors:
+  k8sattributes:
+    extract:
+      metadata: [k8s.pod.name, k8s.namespace.name]
+service:
+  pipelines:
+    traces:
+      processors: [k8sattributes]

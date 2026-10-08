@@ -1,0 +1,25 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 80
+  resource:
+    attributes:
+      - key: cluster
+        value: ${var:cluster}
+        action: upsert
+  batch:
+    timeout: 5s
+exporters:
+  otlp:
+    endpoint: ${env:BACKEND_ENDPOINT}
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, batch]
+      exporters: [otlp]

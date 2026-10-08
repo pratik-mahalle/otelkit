@@ -1,0 +1,9 @@
+otelcol: otelkit-test-no-such-otelcol
+base: base.yaml
+targets:
+  prod-eu:
+    fragments: [k8s-attributes]
+    vars: { cluster: prod-eu }
+    overrides: overrides/prod-eu.yaml
+  vm-a:
+    vars: { cluster: none }
