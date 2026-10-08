@@ -1,0 +1,28 @@
+# A hand-written ConfigMap (key config.yaml) using YAML anchors and merge keys.
+apiVersion: v1
+kind: Namespace
+metadata: {name: legacy}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: agent-config, namespace: legacy}
+data:
+  config.yaml: |
+    x-limits: &limits
+      check_interval: 1s
+      limit_percentage: 80
+    receivers:
+      otlp:
+        protocols:
+          grpc: {endpoint: 0.0.0.0:4317}
+          http: {endpoint: 0.0.0.0:4318}
+    processors:
+      memory_limiter:
+        <<: *limits
+        spike_limit_percentage: 20
+      batch: {timeout: 5s}
+    exporters:
+      debug: {verbosity: basic}
+    service:
+      pipelines:
+        traces: {receivers: [otlp], processors: [memory_limiter, batch], exporters: [debug]}

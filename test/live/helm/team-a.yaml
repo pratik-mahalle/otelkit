@@ -1,0 +1,4 @@
+config:
+  exporters:
+    otlp:
+      endpoint: tempo-a.observability.svc:4317

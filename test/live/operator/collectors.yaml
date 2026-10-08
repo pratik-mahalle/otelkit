@@ -1,0 +1,63 @@
+apiVersion: v1
+kind: Namespace
+metadata: {name: obs}
+---
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+metadata: {name: gateway-eu, namespace: obs}
+spec:
+  mode: deployment
+  config:
+    receivers:
+      otlp:
+        protocols:
+          grpc: {endpoint: 0.0.0.0:4317}
+          http: {endpoint: 0.0.0.0:4318}
+    processors:
+      memory_limiter: {check_interval: 1s, limit_percentage: 80, spike_limit_percentage: 20}
+      batch: {timeout: 5s}
+    exporters:
+      debug: {verbosity: basic}
+    service:
+      pipelines:
+        traces: {receivers: [otlp], processors: [memory_limiter, batch], exporters: [debug]}
+---
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+metadata: {name: gateway-ap, namespace: obs}
+spec:
+  mode: deployment
+  config:
+    receivers:
+      otlp:
+        protocols:
+          grpc: {endpoint: 0.0.0.0:4317}
+          http: {endpoint: 0.0.0.0:4318}
+    processors:
+      memory_limiter: {check_interval: 1s, limit_percentage: 80, spike_limit_percentage: 20}
+      batch: {timeout: 5s}
+    exporters:
+      debug: {verbosity: basic}
+    service:
+      pipelines:
+        traces: {receivers: [otlp], processors: [memory_limiter, batch], exporters: [debug]}
+---
+# Planted drift: HTTP receiver protocol missing.
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+metadata: {name: gateway-us, namespace: obs}
+spec:
+  mode: deployment
+  config:
+    receivers:
+      otlp:
+        protocols:
+          grpc: {endpoint: 0.0.0.0:4317}
+    processors:
+      memory_limiter: {check_interval: 1s, limit_percentage: 80, spike_limit_percentage: 20}
+      batch: {timeout: 5s}
+    exporters:
+      debug: {verbosity: basic}
+    service:
+      pipelines:
+        traces: {receivers: [otlp], processors: [memory_limiter, batch], exporters: [debug]}

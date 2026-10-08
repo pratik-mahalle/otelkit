@@ -1,0 +1,17 @@
+# Planted drift: no memory_limiter, longer batch timeout.
+config:
+  processors:
+    memory_limiter: null
+    batch:
+      timeout: 10s
+  exporters:
+    otlp:
+      endpoint: tempo-c.observability.svc:4317
+  service:
+    pipelines:
+      traces:
+        processors: [batch]
+      metrics:
+        processors: [batch]
+      logs:
+        processors: [batch]

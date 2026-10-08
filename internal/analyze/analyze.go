@@ -171,11 +171,8 @@ func analyzeGroup(g GroupInput, vary []string) Group {
 // drift judges one path. Settings inside a component are judged only among targets that have the
 // component, so a missing component is reported once, at the component.
 func drift(p string, names []string, flats map[string]diff.Flat, vary []string) (Drift, bool) {
-	for _, g := range vary {
-		if diff.Match(g, p) {
-			return Drift{}, false
-		}
-	}
+	// an expected-to-vary path may differ in value, but whether it is there at all still counts
+	presenceOnly := slices.ContainsFunc(vary, func(g string) bool { return diff.Match(g, p) })
 	comp := componentPath(p)
 	values := map[string]string{}
 	for _, n := range names {
@@ -190,9 +187,16 @@ func drift(p string, names []string, flats map[string]diff.Flat, vary []string) 
 			text = v.Text
 		}
 		if strings.Contains(text, "${env:") || strings.Contains(text, "${file:") {
-			return Drift{}, false
+			presenceOnly = true // a placeholder means the value is set per environment
 		}
 		values[n] = text
+	}
+	if presenceOnly {
+		for n, v := range values {
+			if v != Absent {
+				values[n] = diff.Present
+			}
+		}
 	}
 	counts := map[string]int{}
 	for _, v := range values {

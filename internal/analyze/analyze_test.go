@@ -142,3 +142,23 @@ func TestBaseIgnoresCommentsInListsOfMaps(t *testing.T) {
 		t.Errorf("a comment or quoting difference must not split the base: shared=%v deviations=%v", g.Shared, g.Deviations)
 	}
 }
+
+func TestVaryPathMissingInSomeTargetsIsDrift(t *testing.T) {
+	both := "receivers:\n  otlp:\n    protocols:\n      grpc: {endpoint: 0.0.0.0:4317}\n      http: {endpoint: 0.0.0.0:4318}\n"
+	grpcOnly := "receivers:\n  otlp:\n    protocols:\n      grpc: {endpoint: 0.0.0.0:4317}\n"
+	g := Analyze([]GroupInput{{Name: "all", Targets: []Target{target(t, "eu", both), target(t, "ap", both), target(t, "us", grpcOnly)}}}, Options{}).Groups[0]
+	if len(g.Drift) != 1 || g.Drift[0].Line() != "receivers.otlp.protocols.http.endpoint: present in 2/3 targets, missing in us" {
+		t.Errorf("an endpoint may vary in value, but a missing one is drift; got %+v", g.Drift)
+	}
+}
+
+func TestVaryPathWithDifferentValuesIsNotDrift(t *testing.T) {
+	ts := []Target{
+		target(t, "a", "exporters: {otlp: {endpoint: a:4317}}\n"),
+		target(t, "b", "exporters: {otlp: {endpoint: a:4317}}\n"),
+		target(t, "c", "exporters: {otlp: {endpoint: c:4317}}\n"),
+	}
+	if d := Analyze([]GroupInput{{Name: "all", Targets: ts}}, Options{}).Groups[0].Drift; len(d) != 0 {
+		t.Errorf("differing endpoint values are expected: %+v", d)
+	}
+}

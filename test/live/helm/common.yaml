@@ -1,0 +1,20 @@
+# Shared values for the Helm-chart collectors (ConfigMap key "relay").
+mode: deployment
+image:
+  repository: otel/opentelemetry-collector-contrib
+resources:
+  limits: {cpu: 200m, memory: 256Mi}
+config:
+  processors:
+    batch:
+      timeout: 5s
+  exporters:
+    otlp:
+      endpoint: tempo.observability.svc:4317
+      tls: {insecure: true}
+      headers:
+        authorization: Bearer fake-token-for-masking-test
+  service:
+    pipelines:
+      traces:
+        exporters: [otlp]
