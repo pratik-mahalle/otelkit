@@ -43,6 +43,8 @@ type Drift struct {
 	Agree    int               `json:"agree"`
 	Total    int               `json:"total"`
 	Outliers map[string]string `json:"outliers"`
+	// AlsoInPipelines names pipelines whose lists differ only because this component is missing.
+	AlsoInPipelines []string `json:"also_in_pipelines,omitempty"`
 }
 
 // Group is the analysis of one group. All values are masked.
@@ -164,8 +166,85 @@ func analyzeGroup(g GroupInput, vary []string) Group {
 			out.Drift = append(out.Drift, d)
 		}
 	}
+	out.Drift = fold(out.Drift)
 	sort.SliceStable(out.Drift, func(i, j int) bool { return out.Drift[i].Agree > out.Drift[j].Agree })
 	return out
+}
+
+// pipelineKinds maps a pipeline list to the component sections its IDs may come from.
+var pipelineKinds = map[string][]string{
+	"receivers":  {"receivers", "connectors"},
+	"processors": {"processors"},
+	"exporters":  {"exporters", "connectors"},
+}
+
+// fold drops pipeline-list drift whose only difference is a component already reported missing,
+// and notes the pipeline on that component's line, so one root cause reads as one line.
+func fold(ds []Drift) []Drift {
+	missing := map[string]int{} // component path → index of its "present in N/M" drift
+	for i, d := range ds {
+		if d.Majority == diff.Present {
+			missing[d.Path] = i
+		}
+	}
+	var out []Drift
+	also := map[int][]string{}
+	for _, d := range ds {
+		segs := diff.Split(d.Path)
+		kinds, isList := pipelineKinds[segs[len(segs)-1]]
+		if !isList || len(segs) != 4 || segs[0] != "service" || segs[1] != "pipelines" {
+			out = append(out, d)
+			continue
+		}
+		hits, ok := map[int]bool{}, true
+		for n, v := range d.Outliers {
+			majority, got := parseList(d.Majority), parseList(v)
+			var kept []string
+			for _, id := range majority {
+				if slices.Contains(got, id) {
+					kept = append(kept, id)
+					continue
+				}
+				i, found := -1, false
+				for _, k := range kinds {
+					if j, isMissing := missing[diff.Join([]string{k, id})]; isMissing && ds[j].Outliers[n] == Absent {
+						i, found = j, true
+					}
+				}
+				if !found {
+					ok = false
+				}
+				hits[i] = true
+			}
+			if !slices.Equal(kept, got) || len(hits) == 0 {
+				ok = false
+			}
+		}
+		if !ok {
+			out = append(out, d)
+			continue
+		}
+		for i := range hits {
+			also[i] = append(also[i], segs[2])
+		}
+	}
+	for i := range out {
+		for j, d := range ds {
+			if d.Path == out[i].Path && len(also[j]) > 0 {
+				out[i].AlsoInPipelines = slices.Sorted(slices.Values(also[j]))
+			}
+		}
+	}
+	return out
+}
+
+// parseList reads the "[a, b]" text Flatten produces for a list of IDs.
+func parseList(s string) []string {
+	s = strings.TrimSuffix(strings.TrimPrefix(s, "["), "]")
+	if s == "" {
+		return nil
+	}
+	return strings.Split(s, ", ")
 }
 
 // drift judges one path. Settings inside a component are judged only among targets that have the

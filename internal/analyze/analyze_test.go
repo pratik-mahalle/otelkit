@@ -56,9 +56,8 @@ func TestAnalyzeFindsDrift(t *testing.T) {
 	}
 	got := strings.Join(lines, "\n")
 	for _, want := range []string{
-		"processors.memory_limiter: present in 2/3 targets, missing in c",
+		"processors.memory_limiter: present in 2/3 targets, missing in c (also missing from pipelines traces)",
 		"processors.batch.timeout: 2/3 targets use 5s; c uses 10s",
-		"service.pipelines.traces.processors: 2/3 targets use [memory_limiter, batch]; c uses [batch]",
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("missing drift %q in\n%s", want, got)
@@ -121,7 +120,7 @@ func TestWriteText(t *testing.T) {
 	r := Analyze([]GroupInput{{Name: "all", Targets: fleet(t)}}, Options{})
 	r.WriteText(&buf)
 	out := buf.String()
-	for _, want := range []string{"group all: 3 targets", "likely drift (3):", "base (", "deviations from base:", "    c:"} {
+	for _, want := range []string{"group all: 3 targets", "likely drift (2):", "base (", "deviations from base:", "    c:"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q in\n%s", want, out)
 		}
@@ -160,5 +159,57 @@ func TestVaryPathWithDifferentValuesIsNotDrift(t *testing.T) {
 	}
 	if d := Analyze([]GroupInput{{Name: "all", Targets: ts}}, Options{}).Groups[0].Drift; len(d) != 0 {
 		t.Errorf("differing endpoint values are expected: %+v", d)
+	}
+}
+
+const threePipelines = `
+processors:
+  memory_limiter: {check_interval: 1s}
+  batch: {}
+service:
+  pipelines:
+    traces: {processors: [memory_limiter, batch]}
+    metrics: {processors: [memory_limiter, batch]}
+    logs: {processors: [memory_limiter, batch]}
+`
+
+func TestDriftFoldsPipelineListsIntoMissingComponent(t *testing.T) {
+	c := strings.NewReplacer("  memory_limiter: {check_interval: 1s}\n", "", "[memory_limiter, batch]", "[batch]").Replace(threePipelines)
+	g := Analyze([]GroupInput{{Name: "all", Targets: []Target{target(t, "a", threePipelines), target(t, "b", threePipelines), target(t, "c", c)}}}, Options{}).Groups[0]
+	if len(g.Drift) != 1 {
+		t.Fatalf("one root cause must be one drift line, got %d: %+v", len(g.Drift), g.Drift)
+	}
+	if want := "processors.memory_limiter: present in 2/3 targets, missing in c (also missing from pipelines logs, metrics, traces)"; g.Drift[0].Line() != want {
+		t.Errorf("got  %q\nwant %q", g.Drift[0].Line(), want)
+	}
+}
+
+func TestDriftKeepsPipelineLineWithOtherDifferences(t *testing.T) {
+	c := strings.NewReplacer("  memory_limiter: {check_interval: 1s}\n", "  k8sattributes: {}\n", "traces: {processors: [memory_limiter, batch]}", "traces: {processors: [k8sattributes, batch]}", "[memory_limiter, batch]", "[batch]").Replace(threePipelines)
+	g := Analyze([]GroupInput{{Name: "all", Targets: []Target{target(t, "a", threePipelines), target(t, "b", threePipelines), target(t, "c", c)}}}, Options{}).Groups[0]
+	var lines []string
+	for _, d := range g.Drift {
+		lines = append(lines, d.Line())
+	}
+	got := strings.Join(lines, "\n")
+	if !strings.Contains(got, "service.pipelines.traces.processors: 2/3 targets use [memory_limiter, batch]; c uses [k8sattributes, batch]") {
+		t.Errorf("traces differs beyond the missing component and must stay:\n%s", got)
+	}
+	if !strings.Contains(got, "(also missing from pipelines logs, metrics)") {
+		t.Errorf("logs and metrics only lack memory_limiter and must fold:\n%s", got)
+	}
+}
+
+func TestWriteTextSmallGroupsAndGrammar(t *testing.T) {
+	var buf bytes.Buffer
+	Analyze([]GroupInput{
+		{Name: "one", Targets: []Target{target(t, "a", cfgA)}},
+		{Name: "two", Targets: []Target{target(t, "a", cfgA), target(t, "b", cfgA)}},
+	}, Options{}).WriteText(&buf)
+	out := buf.String()
+	for _, want := range []string{"group one: 1 target,", "group two: 2 targets,", "note: drift needs a majority (3+ targets); see deviations below"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in\n%s", want, out)
+		}
 	}
 }

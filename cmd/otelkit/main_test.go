@@ -116,3 +116,11 @@ func TestUsage(t *testing.T) {
 		t.Errorf("exit %d, stderr %q", code, errOut)
 	}
 }
+
+func TestAnalyzeNameFlag(t *testing.T) {
+	src := configs(t)
+	code, out, errOut := call("fleet", "analyze", "--name", "edge-c="+filepath.Join(src, "c.yaml"), filepath.Join(src, "a.yaml"), filepath.Join(src, "b.yaml"), filepath.Join(src, "c.yaml"))
+	if code != 0 || !strings.Contains(out, "missing in edge-c") {
+		t.Errorf("exit %d stderr %q:\n%s", code, errOut, out)
+	}
+}

@@ -15,8 +15,9 @@ import (
 func runAnalyze(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("analyze", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	var groups, vary multi
+	var groups, vary, aliases multi
 	fs.Var(&groups, "group", "name=<source>: analyze this source as part of group name; repeatable")
+	fs.Var(&aliases, "name", "alias=<source>: call this source's target alias instead of the default; repeatable")
 	fs.Var(&vary, "vary", "path glob expected to differ between targets; repeatable")
 	format := fs.String("format", "text", "text or json")
 	failOnDrift := fs.Bool("fail-on-drift", false, "exit 1 when drift is found")
@@ -52,7 +53,17 @@ func runAnalyze(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 
-	targets, errs := loader.Load(context.Background(), srcs)
+	l := loader
+	l.Aliases = map[string]string{}
+	for _, a := range aliases {
+		name, src, ok := strings.Cut(a, "=")
+		if !ok {
+			fmt.Fprintf(stderr, "error: --name %q: want alias=<source>\n", a)
+			return 2
+		}
+		l.Aliases[src] = name
+	}
+	targets, errs := l.Load(context.Background(), srcs)
 	for _, err := range errs {
 		fmt.Fprintln(stderr, "error:", err)
 	}

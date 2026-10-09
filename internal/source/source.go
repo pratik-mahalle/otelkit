@@ -73,6 +73,7 @@ func DefaultClients(kubeContext string) (kubernetes.Interface, dynamic.Interface
 // Loader loads sources. Clients may be nil when no k8s:// sources are used.
 type Loader struct {
 	Clients Clients
+	Aliases map[string]string // source argument → target name, overriding the default
 }
 
 // Load resolves file paths, directories, globs and k8s:// URLs into targets.
@@ -123,7 +124,34 @@ func (l Loader) Load(ctx context.Context, args []string) ([]Target, []error) {
 		}
 		targets = append(targets, Target{Name: names[i], Source: pathArgs[i], Root: root, Deployed: Deployed{File: abs}})
 	}
-	return unique(targets, errs)
+	qualifyK8s(targets)
+	var named []Target
+	for _, t := range targets {
+		if alias, ok := l.Aliases[t.Source]; ok {
+			if alias == "" || strings.ContainsAny(alias, `/\`) {
+				errs = append(errs, fmt.Errorf("--name %q for %s: a name cannot be empty or contain a slash", alias, t.Source))
+				continue
+			}
+			t.Name = alias
+		}
+		named = append(named, t)
+	}
+	return unique(named, errs)
+}
+
+// qualifyK8s prefixes the context to Kubernetes target names that would otherwise collide.
+func qualifyK8s(targets []Target) {
+	count := map[string]int{}
+	for _, t := range targets {
+		if t.Deployed.K8s != nil {
+			count[t.Name]++
+		}
+	}
+	for i, t := range targets {
+		if t.Deployed.K8s != nil && count[t.Name] > 1 {
+			targets[i].Name = t.Deployed.K8s.contextName() + "-" + t.Name
+		}
+	}
 }
 
 // unique drops targets whose name is already taken, reporting each, so no config is silently merged into another.
@@ -234,16 +262,22 @@ func ParseK8s(s string) (K8sRef, error) {
 	return ref, nil
 }
 
+// name is <namespace>-<object>; qualifyK8s adds the context when two targets share it.
 func (r K8sRef) name() string {
-	ctx := r.Context
-	if i := strings.LastIndexAny(ctx, "/:"); i >= 0 {
-		ctx = ctx[i+1:]
-	}
 	obj := r.ConfigMap
 	if obj == "" {
 		obj = r.Otelcol
 	}
-	return ctx + "-" + r.Namespace + "-" + obj
+	return r.Namespace + "-" + obj
+}
+
+// contextName is the last part of the context, e.g. prod-eu for an EKS ARN ending in cluster/prod-eu.
+func (r K8sRef) contextName() string {
+	ctx := r.Context
+	if i := strings.LastIndexAny(ctx, "/:"); i >= 0 {
+		ctx = ctx[i+1:]
+	}
+	return ctx
 }
 
 func (l Loader) loadK8s(ctx context.Context, r K8sRef) (*yaml.Node, error) {

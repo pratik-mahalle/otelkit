@@ -27,14 +27,20 @@ start=$(date +%s)
 $OK fleet analyze "${HELM[@]}" "${OPER[@]}" "${RAW[@]}" "${VMS[@]}" > out/analyze.txt 2> out/analyze.err; rc=$?
 echo "analyze took $(( $(date +%s) - start ))s, exit $rc"
 check "analyze exits 0"                               test $rc -eq 0
-check "analyze loads all 9 targets"                   test "$(grep -E '^group ' out/analyze.txt | grep -oE '[0-9]+ targets' | awk '{s+=$1} END{print s}')" -eq 9
-check "Helm: missing memory_limiter on team-c"        has out/analyze.txt "processors.memory_limiter: present in 2/3 targets, missing in kind-otelkit-test-team-c-opentelemetry-collector"
-check "Helm: batch timeout 10s on team-c"             has out/analyze.txt "processors.batch.timeout: 2/3 targets use 5s; kind-otelkit-test-team-c-opentelemetry-collector uses 10s"
-check "Operator: gateway-us missing HTTP receiver"    has out/analyze.txt "receivers.otlp.protocols.http.endpoint: present in 2/3 targets, missing in kind-otelkit-test-obs-gateway-us"
+check "analyze loads all 9 targets"                   test "$(grep -E '^group ' out/analyze.txt | grep -oE '[0-9]+ targets?' | awk '{s+=$1} END{print s}')" -eq 9
+check "Helm: missing memory_limiter, one line"        has out/analyze.txt "processors.memory_limiter: present in 2/3 targets, missing in team-c-opentelemetry-collector (also missing from pipelines logs, metrics, traces)"
+check "Helm: no separate pipeline-list lines"         lacks out/analyze.txt "service.pipelines.traces.processors: 2/3"
+check "Helm: batch timeout 10s on team-c"             has out/analyze.txt "processors.batch.timeout: 2/3 targets use 5s; team-c-opentelemetry-collector uses 10s"
+check "Operator: gateway-us missing HTTP receiver"    has out/analyze.txt "receivers.otlp.protocols.http.endpoint: present in 2/3 targets, missing in obs-gateway-us"
 check "Helm ConfigMap key 'relay' found by default"   lacks out/analyze.err "has no key"
 check "anchors expanded (raw ConfigMap)"              has out/analyze.txt "processors.memory_limiter.check_interval = 1s"
 check "no merge key leaks into output"                lacks out/analyze.txt "<<"
 check "VM files named apart (vms-vm-a-config)"        has out/analyze.txt "vms-vm-a-config"
+check "two-target group explains missing drift"       has out/analyze.txt "note: drift needs a majority (3+ targets)"
+check "single-target group says '1 target'"           has out/analyze.txt "group raw: 1 target,"
+check "Kubernetes names drop the context"             lacks out/analyze.txt "kind-otelkit-test-"
+$OK fleet analyze --name "team-c=$K/team-c/configmap/opentelemetry-collector" "${HELM[@]}" > out/analyze-named.txt 2>&1
+check "--name gives a short alias"                    has out/analyze-named.txt "missing in team-c (also missing"
 check "endpoints not reported as drift"               lacks out/analyze.txt "exporters.otlp.endpoint: "
 check "secret header masked"                          lacks out/analyze.txt "fake-token-for-masking-test"
 check "htpasswd password masked"                      lacks out/analyze.txt "SuperSecretPw"

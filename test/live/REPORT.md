@@ -1,6 +1,6 @@
 # otelkit fleet — live Kubernetes test report
 
-Date: 2026-10-08 · otelkit `main` · result: **25 / 25 checks passed** after one product fix found by this run.
+Date: 2026-10-09 · otelkit `main` · result: **30 / 30 checks passed**, after one product bug and four usability issues found by the first run were fixed.
 
 ## What was tested
 
@@ -21,12 +21,12 @@ All 6 in-cluster Collectors were running. Validation used the real `otelcol-cont
 
 | Group | Shared | Drift found |
 |---|---|---|
-| helm (3) | 80% | `processors.memory_limiter` present in 2/3, missing in team-c · `processors.batch.timeout` 2/3 use 5s, team-c uses 10s · traces/metrics/logs processor lists differ in team-c |
+| helm (3) | 80% | `processors.memory_limiter` present in 2/3, missing in team-c (also missing from pipelines logs, metrics, traces) · `processors.batch.timeout` 2/3 use 5s, team-c uses 10s |
 | operator (3) | 94% | `receivers.otlp.protocols.http.endpoint` present in 2/3, missing in gateway-us |
 | raw (1) | 100% | — |
-| vms (2) | 88% | none (two targets can't form a majority; the differences are listed as deviations) |
+| vms (2) | 88% | none — the report says so: "drift needs a majority (3+ targets); see deviations below" |
 
-Also verified: the Helm chart's `relay` key was picked automatically; the Operator CR's structured `spec.config` loaded; anchors and `<<` were expanded with no `<<` in output; the two `config.yaml` files became `vms-vm-a-config` / `vms-vm-b-config`; endpoints were not reported as drift; the `Bearer` header and the htpasswd password never appeared (shown as `****`); `--format json` is valid; `--fail-on-drift` exits 1.
+Target names are short (`team-c-opentelemetry-collector`, `obs-gateway-us`); `--name team-c=k8s://…` gives an alias. Also verified: the Helm chart's `relay` key was picked automatically; the Operator CR's structured `spec.config` loaded; anchors and `<<` were expanded with no `<<` in output; the two `config.yaml` files became `vms-vm-a-config` / `vms-vm-b-config`; endpoints were not reported as drift; the `Bearer` header and the htpasswd password never appeared (shown as `****`); `--format json` is valid; `--fail-on-drift` exits 1.
 
 ### `--emit-fleet` — round trip verified for all 9 live configs
 
@@ -46,12 +46,12 @@ Also verified: the Helm chart's `relay` key was picked automatically; the Operat
 
 **Missing settings hidden by the "expected to vary" rule.** gateway-us had no HTTP receiver, but `analyze` reported 0 drift: the built-in glob `*.endpoint` skipped the path entirely, so a missing protocol looked like a normal endpoint difference. Fixed so an expected-to-vary path still reports when it is **absent** in a minority (values may still differ freely). Tests: `TestVaryPathMissingInSomeTargetsIsDrift` (failed first), `TestVaryPathWithDifferentValuesIsNotDrift`.
 
-## Usability findings (not fixed)
+## Usability issues found by the first run — fixed
 
-1. **One root cause, several drift lines.** Removing `memory_limiter` on team-c produced 5 lines (component + 3 pipeline lists + timeout). Accurate, but a reader has to connect them.
-2. **Long target names.** `kind-otelkit-test-team-c-opentelemetry-collector` dominates every line; a way to name sources (e.g. `name=k8s://...`) would help.
-3. **Groups of two never show drift** — with no majority possible, differences only appear under deviations. Worth saying in the report header.
-4. "1 targets" grammar in the summary line.
+1. **One root cause, several drift lines.** Removing `memory_limiter` on team-c produced 5 lines. Pipeline-list drift caused only by a missing component now folds into that component's line ("also missing from pipelines logs, metrics, traces"); a pipeline list that differs in any other way still gets its own line. JSON: `also_in_pipelines`.
+2. **Long target names.** `kind-otelkit-test-team-c-opentelemetry-collector` → `team-c-opentelemetry-collector`; the context is added only when two contexts hold the same namespace/object. `--name <alias>=<source>` sets any name.
+3. **Groups of two never show drift** — the group header now says so and points at deviations.
+4. "1 targets" → "1 target".
 
 ## Not covered
 
@@ -62,6 +62,6 @@ EKS/GKE/AKS auth plugins and large clusters (only kind); DaemonSet-mode Helm cha
 ```bash
 cd test/live
 ./setup.sh      # kind cluster + Helm/Operator/raw collectors + otelcol-contrib download (~5 min first run)
-./run.sh        # 25 checks; outputs in out/
+./run.sh        # 30 checks; outputs in out/
 ./teardown.sh   # deletes the cluster
 ```

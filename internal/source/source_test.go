@@ -91,7 +91,7 @@ func TestParseK8sContextWithSlashes(t *testing.T) {
 	if r != want {
 		t.Errorf("got %+v", r)
 	}
-	if r.name() != "prod-eu-observability-otel-collector" {
+	if r.name() != "observability-otel-collector" {
 		t.Errorf("name = %s", r.name())
 	}
 	if _, err := ParseK8s("k8s://ctx/ns/deployment/x"); err == nil {
@@ -117,7 +117,7 @@ func TestLoadConfigMapDefaultsToRelayKey(t *testing.T) {
 	if len(errs) != 0 {
 		t.Fatal(errs)
 	}
-	if model.Get(ts[0].Root, "receivers", "otlp") == nil || ts[0].Name != "prod-obs-otel-collector" {
+	if model.Get(ts[0].Root, "receivers", "otlp") == nil || ts[0].Name != "obs-otel-collector" {
 		t.Errorf("got %+v", ts[0])
 	}
 }
@@ -175,5 +175,34 @@ func TestLoadSameFileTwiceIsOneTarget(t *testing.T) {
 	ts, errs := Loader{}.Load(context.Background(), []string{dir, filepath.Join(dir, "a.yaml")})
 	if len(ts) != 1 || len(errs) != 0 {
 		t.Errorf("targets=%v errs=%v", names(ts), errs)
+	}
+}
+
+func TestK8sNamesAddContextOnlyOnCollision(t *testing.T) {
+	cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "otel", Namespace: "obs"}, Data: map[string]string{"config.yaml": "{}\n"}}
+	other := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "agent", Namespace: "obs"}, Data: map[string]string{"config.yaml": "{}\n"}}
+	l := Loader{Clients: fakeClients([]runtime.Object{cm, other})}
+	ts, errs := l.Load(context.Background(), []string{
+		"k8s://prod-eu/obs/configmap/otel", "k8s://prod-us/obs/configmap/otel", "k8s://prod-eu/obs/configmap/agent",
+	})
+	if len(errs) != 0 {
+		t.Fatal(errs)
+	}
+	if got := names(ts); !slices.Equal(got, []string{"obs-agent", "prod-eu-obs-otel", "prod-us-obs-otel"}) {
+		t.Errorf("names = %v", got)
+	}
+}
+
+func TestLoadAliases(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "a.yaml"), "{}\n")
+	src := filepath.Join(dir, "a.yaml")
+	ts, errs := Loader{Aliases: map[string]string{src: "edge-1"}}.Load(context.Background(), []string{src})
+	if len(errs) != 0 || len(ts) != 1 || ts[0].Name != "edge-1" {
+		t.Fatalf("targets=%v errs=%v", names(ts), errs)
+	}
+	_, errs = Loader{Aliases: map[string]string{src: "a/b"}}.Load(context.Background(), []string{src})
+	if len(errs) != 1 {
+		t.Errorf("an alias with / must be rejected: %v", errs)
 	}
 }

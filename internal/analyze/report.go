@@ -14,7 +14,11 @@ import (
 func (d Drift) Line() string {
 	outs := slices.Sorted(maps.Keys(d.Outliers))
 	if d.Majority == diff.Present {
-		return fmt.Sprintf("%s: present in %d/%d targets, missing in %s", d.Path, d.Agree, d.Total, strings.Join(outs, ", "))
+		line := fmt.Sprintf("%s: present in %d/%d targets, missing in %s", d.Path, d.Agree, d.Total, strings.Join(outs, ", "))
+		if len(d.AlsoInPipelines) > 0 {
+			line += " (also missing from pipelines " + strings.Join(d.AlsoInPipelines, ", ") + ")"
+		}
+		return line
 	}
 	parts := make([]string, len(outs))
 	for i, n := range outs {
@@ -26,8 +30,16 @@ func (d Drift) Line() string {
 // WriteText prints the human report: summary, drift, base and per-target deviations.
 func (r Report) WriteText(w io.Writer) {
 	for _, g := range r.Groups {
-		fmt.Fprintf(w, "group %s: %d targets, %.0f%% of settings shared\n", g.Name, len(g.Targets), g.Shared*100)
-		fmt.Fprintf(w, "  targets: %s\n\n", strings.Join(g.Targets, ", "))
+		noun := "targets"
+		if len(g.Targets) == 1 {
+			noun = "target"
+		}
+		fmt.Fprintf(w, "group %s: %d %s, %.0f%% of settings shared\n", g.Name, len(g.Targets), noun, g.Shared*100)
+		fmt.Fprintf(w, "  targets: %s\n", strings.Join(g.Targets, ", "))
+		if len(g.Targets) == 2 {
+			fmt.Fprintln(w, "  note: drift needs a majority (3+ targets); see deviations below")
+		}
+		fmt.Fprintln(w)
 		fmt.Fprintf(w, "  likely drift (%d):\n", len(g.Drift))
 		for _, d := range g.Drift {
 			fmt.Fprintf(w, "    %s\n", d.Line())

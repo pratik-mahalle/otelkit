@@ -14,7 +14,7 @@ otelkit fleet analyze --group vms=./vm-configs --group k8s=k8s://prod-eu/observa
 
 Reports the settings every target shares, likely-accidental drift (a majority agrees, a few differ),
 and each target's deviations. Endpoints, headers, auth and TLS file paths are expected to differ;
-add more with `--vary 'exporters.*.compression'`. Secrets are masked. `--format json`, `--fail-on-drift` for CI.
+add more with `--vary 'exporters.*.compression'`. Name a target with `--name edge-1=<source>`. Secrets are masked. `--format json`, `--fail-on-drift` for CI.
 
 ## 2. Turn them into one source of truth
 
