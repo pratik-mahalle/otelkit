@@ -46,10 +46,21 @@ func Mask(path, text string) string {
 	if text == Present || placeholder.MatchString(text) {
 		return text
 	}
-	if secretKey.MatchString(path) || urlUserinfo.MatchString(text) {
+	if (secretKey.MatchString(path) && !isAttributeName(path)) || urlUserinfo.MatchString(text) {
 		return "****"
 	}
 	return text
+}
+
+// isAttributeName reports a `key` field inside an attributes/actions list, which names an attribute
+// rather than holding a secret (e.g. processors.attributes.actions.0.key).
+func isAttributeName(path string) bool {
+	segs := Split(path)
+	if len(segs) < 3 || segs[len(segs)-1] != "key" {
+		return false
+	}
+	list := segs[len(segs)-3]
+	return list == "attributes" || list == "actions"
 }
 
 // Match reports whether path matches glob, where * matches any characters including dots.

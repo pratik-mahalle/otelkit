@@ -34,7 +34,10 @@ func Substitute(n *yaml.Node, vars map[string]string, file string) error {
 	if missing != "" {
 		return fmt.Errorf("%s:%d unknown var %q", file, n.Line, missing)
 	}
-	if n.Style == 0 {
+	switch {
+	case n.Style == 0 && n.Value == "":
+		n.Style = yaml.DoubleQuotedStyle // an empty plain scalar would be null, and null deletes in an override
+	case n.Style == 0:
 		n.Tag = "" // plain scalars re-resolve, so `port: ${var:port}` stays an int
 	}
 	return nil

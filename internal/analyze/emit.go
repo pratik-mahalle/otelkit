@@ -55,17 +55,29 @@ func Emit(dir string, targets []EmitTarget) error {
 		spec := build.TargetSpec{Overrides: rel}
 		if t.Deployed.File != "" || t.Deployed.K8s != nil {
 			d := t.Deployed
+			if d.File != "" {
+				d.File = relativeTo(dir, d.File) // so a committed fleet works on other machines and in CI
+			}
 			spec.Deployed = &d
 		}
 		fl.Targets[t.Name] = spec
 		files[rel] = ov
 	}
+	// write into a sibling temp dir and rename it into place, so a failure never leaves a partial fleet
+	if err := os.MkdirAll(filepath.Dir(dir), 0o755); err != nil {
+		return err
+	}
+	tmp, err := os.MkdirTemp(filepath.Dir(dir), ".otelkit-emit-*")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(tmp)
 	for rel, node := range files {
 		data, err := model.Marshal(node)
 		if err != nil {
 			return err
 		}
-		if err := writeFile(filepath.Join(dir, rel), data); err != nil {
+		if err := writeFile(filepath.Join(tmp, rel), data); err != nil {
 			return err
 		}
 	}
@@ -73,7 +85,27 @@ func Emit(dir string, targets []EmitTarget) error {
 	if err != nil {
 		return err
 	}
-	return writeFile(filepath.Join(dir, "fleet.yaml"), data)
+	if err := writeFile(filepath.Join(tmp, "fleet.yaml"), data); err != nil {
+		return err
+	}
+	if err := os.Chmod(tmp, 0o755); err != nil {
+		return err
+	}
+	os.Remove(dir) // an existing dir is empty (checked above); Rename needs it gone
+	return os.Rename(tmp, dir)
+}
+
+// relativeTo returns path relative to dir when possible, else path unchanged.
+func relativeTo(dir, path string) string {
+	absDir, err1 := filepath.Abs(dir)
+	absPath, err2 := filepath.Abs(path)
+	if err1 != nil || err2 != nil {
+		return path
+	}
+	if rel, err := filepath.Rel(absDir, absPath); err == nil {
+		return rel
+	}
+	return path
 }
 
 // overrideFor returns what target adds beyond base. Base is the intersection of all

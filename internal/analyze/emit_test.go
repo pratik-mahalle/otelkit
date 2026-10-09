@@ -32,7 +32,7 @@ func TestEmitRoundTrips(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if f.Targets["a"].Deployed.File != "/configs/a.yaml" {
+	if got := filepath.Join(f.Dir, f.Targets["a"].Deployed.File); got != "/configs/a.yaml" {
 		t.Errorf("deployed not recorded: %+v", f.Targets["a"])
 	}
 	for _, tg := range ts {
@@ -66,5 +66,32 @@ func TestEmitRejectsDuplicateNames(t *testing.T) {
 	}
 	if _, err := os.Stat(dir); !os.IsNotExist(err) {
 		t.Error("nothing may be written on failure")
+	}
+}
+
+func TestEmitWritesRelativeDeployedPaths(t *testing.T) {
+	root := t.TempDir()
+	cfg := filepath.Join(root, "configs", "a.yaml")
+	os.MkdirAll(filepath.Dir(cfg), 0o755)
+	os.WriteFile(cfg, []byte(cfgA), 0o644)
+	ts := emitTargets(t)[:1]
+	ts[0].Deployed = source.Deployed{File: cfg}
+	if err := Emit(filepath.Join(root, "fleet"), ts); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := os.ReadFile(filepath.Join(root, "fleet", "fleet.yaml"))
+	if !strings.Contains(string(data), "file: ../configs/a.yaml") {
+		t.Errorf("a committed fleet must work on other machines; want a relative path:\n%s", data)
+	}
+}
+
+func TestEmitLeavesNoTempDirs(t *testing.T) {
+	root := t.TempDir()
+	if err := Emit(filepath.Join(root, "fleet"), emitTargets(t)); err != nil {
+		t.Fatal(err)
+	}
+	entries, _ := os.ReadDir(root)
+	if len(entries) != 1 || entries[0].Name() != "fleet" {
+		t.Errorf("only the fleet dir may remain, got %v", entries)
 	}
 }

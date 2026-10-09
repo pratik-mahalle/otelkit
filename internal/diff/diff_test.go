@@ -133,3 +133,15 @@ func TestMaskCommonSecretShapes(t *testing.T) {
 		}
 	}
 }
+
+func TestMaskKeepsAttributeNames(t *testing.T) {
+	if got := Mask("processors.attributes.actions.0.key", "http.method"); got != "http.method" {
+		t.Errorf("an attribute's key is its name, not a secret: %q", got)
+	}
+	if got := Mask("processors.resource.attributes.2.key", "k8s.pod.name"); got != "k8s.pod.name" {
+		t.Errorf("resource attribute name masked: %q", got)
+	}
+	if got := Mask("exporters.otlp.headers.api-key", "abc"); got != "****" {
+		t.Errorf("a header named api-key is still a secret: %q", got)
+	}
+}

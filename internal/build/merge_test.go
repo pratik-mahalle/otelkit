@@ -168,3 +168,17 @@ func TestMergeFragmentConflictWhenFirstMatchesBase(t *testing.T) {
 		t.Fatalf("two fragments disagree; want conflict, got %v", err)
 	}
 }
+
+func TestSubstituteEmptyVarStaysEmptyString(t *testing.T) {
+	ov := layer(t, Override, "o.yaml", "exporters:\n  otlp:\n    compression: ${var:c}\n")
+	if err := Substitute(ov.Root, map[string]string{"c": ""}, "o.yaml"); err != nil {
+		t.Fatal(err)
+	}
+	m, err := Merge([]Layer{layer(t, Base, "base.yaml", "exporters:\n  otlp:\n    compression: gzip\n"), ov})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v := model.Get(m.Root, "exporters", "otlp", "compression"); v == nil || v.Value != "" {
+		t.Fatalf("an empty var must set an empty string, not delete the key: %v", v)
+	}
+}
