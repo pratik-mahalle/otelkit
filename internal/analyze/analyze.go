@@ -178,13 +178,14 @@ var pipelineKinds = map[string][]string{
 	"exporters":  {"exporters", "connectors"},
 }
 
-// fold drops pipeline-list drift whose only difference is a component already reported missing,
-// and notes the pipeline on that component's line, so one root cause reads as one line.
+// fold drops pipeline-list drift whose only difference is a component already reported as missing
+// from (or only present in) the same targets, and notes the pipeline on that component's line,
+// so one root cause reads as one line.
 func fold(ds []Drift) []Drift {
-	missing := map[string]int{} // component path → index of its "present in N/M" drift
+	comps := map[string]int{} // component path → index of its presence drift
 	for i, d := range ds {
-		if d.Majority == diff.Present {
-			missing[d.Path] = i
+		if d.Majority == diff.Present || d.Majority == Absent {
+			comps[d.Path] = i
 		}
 	}
 	var out []Drift
@@ -196,30 +197,7 @@ func fold(ds []Drift) []Drift {
 			out = append(out, d)
 			continue
 		}
-		hits, ok := map[int]bool{}, true
-		for n, v := range d.Outliers {
-			majority, got := parseList(d.Majority), parseList(v)
-			var kept []string
-			for _, id := range majority {
-				if slices.Contains(got, id) {
-					kept = append(kept, id)
-					continue
-				}
-				i, found := -1, false
-				for _, k := range kinds {
-					if j, isMissing := missing[diff.Join([]string{k, id})]; isMissing && ds[j].Outliers[n] == Absent {
-						i, found = j, true
-					}
-				}
-				if !found {
-					ok = false
-				}
-				hits[i] = true
-			}
-			if !slices.Equal(kept, got) || len(hits) == 0 {
-				ok = false
-			}
-		}
+		hits, ok := foldable(d, kinds, ds, comps)
 		if !ok {
 			out = append(out, d)
 			continue
@@ -238,13 +216,61 @@ func fold(ds []Drift) []Drift {
 	return out
 }
 
-// parseList reads the "[a, b]" text Flatten produces for a list of IDs.
-func parseList(s string) []string {
-	s = strings.TrimSuffix(strings.TrimPrefix(s, "["), "]")
-	if s == "" {
-		return nil
+// foldable reports whether each outlier's list differs from the majority's only by components that
+// another drift line already reports as missing from, or only present in, that outlier.
+func foldable(d Drift, kinds []string, ds []Drift, comps map[string]int) (map[int]bool, bool) {
+	majority, ok := parseList(d.Majority)
+	if !ok {
+		return nil, false
 	}
-	return strings.Split(s, ", ")
+	hits := map[int]bool{}
+	for n, v := range d.Outliers {
+		got, ok := parseList(v)
+		if !ok {
+			return nil, false
+		}
+		explained := func(id string, missing bool) bool {
+			for _, k := range kinds {
+				if i, found := comps[diff.Join([]string{k, id})]; found {
+					if o, isOutlier := ds[i].Outliers[n]; isOutlier && (o == Absent) == missing {
+						hits[i] = true
+						return true
+					}
+				}
+			}
+			return false
+		}
+		var common, rest []string
+		for _, id := range majority {
+			if slices.Contains(got, id) {
+				common = append(common, id)
+			} else if !explained(id, true) {
+				return nil, false
+			}
+		}
+		for _, id := range got {
+			if slices.Contains(majority, id) {
+				rest = append(rest, id)
+			} else if !explained(id, false) {
+				return nil, false
+			}
+		}
+		if !slices.Equal(common, rest) {
+			return nil, false
+		}
+	}
+	return hits, len(hits) > 0
+}
+
+// parseList reads the "[a, b]" text Flatten produces for a list of IDs.
+func parseList(s string) ([]string, bool) {
+	if !strings.HasPrefix(s, "[") || !strings.HasSuffix(s, "]") {
+		return nil, false
+	}
+	if s = s[1 : len(s)-1]; s == "" {
+		return nil, true
+	}
+	return strings.Split(s, ", "), true
 }
 
 // drift judges one path. Settings inside a component are judged only among targets that have the
@@ -290,13 +316,21 @@ func drift(p string, names []string, flats map[string]diff.Flat, vary []string) 
 	if best*2 <= len(values) || best == len(values) {
 		return Drift{}, false
 	}
-	d := Drift{Path: p, Majority: diff.Mask(p, top), Agree: best, Total: len(values), Outliers: map[string]string{}}
+	d := Drift{Path: p, Majority: maskValue(p, top), Agree: best, Total: len(values), Outliers: map[string]string{}}
 	for n, v := range values {
 		if v != top {
-			d.Outliers[n] = diff.Mask(p, v)
+			d.Outliers[n] = maskValue(p, v)
 		}
 	}
 	return d, true
+}
+
+// maskValue masks like diff.Mask but keeps the absent/present markers, which hold no secret.
+func maskValue(p, v string) string {
+	if v == Absent || v == diff.Present {
+		return v
+	}
+	return diff.Mask(p, v)
 }
 
 func componentPath(p string) string {

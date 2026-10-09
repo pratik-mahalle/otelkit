@@ -185,8 +185,10 @@ func TestDriftFoldsPipelineListsIntoMissingComponent(t *testing.T) {
 }
 
 func TestDriftKeepsPipelineLineWithOtherDifferences(t *testing.T) {
-	c := strings.NewReplacer("  memory_limiter: {check_interval: 1s}\n", "  k8sattributes: {}\n", "traces: {processors: [memory_limiter, batch]}", "traces: {processors: [k8sattributes, batch]}", "[memory_limiter, batch]", "[batch]").Replace(threePipelines)
-	g := Analyze([]GroupInput{{Name: "all", Targets: []Target{target(t, "a", threePipelines), target(t, "b", threePipelines), target(t, "c", c)}}}, Options{}).Groups[0]
+	// k8sattributes is defined everywhere, so using it only in c's traces is not explained by any component line
+	all := strings.Replace(threePipelines, "  batch: {}\n", "  batch: {}\n  k8sattributes: {}\n", 1)
+	c := strings.NewReplacer("  memory_limiter: {check_interval: 1s}\n", "", "traces: {processors: [memory_limiter, batch]}", "traces: {processors: [k8sattributes, batch]}", "[memory_limiter, batch]", "[batch]").Replace(all)
+	g := Analyze([]GroupInput{{Name: "all", Targets: []Target{target(t, "a", all), target(t, "b", all), target(t, "c", c)}}}, Options{}).Groups[0]
 	var lines []string
 	for _, d := range g.Drift {
 		lines = append(lines, d.Line())
@@ -211,5 +213,51 @@ func TestWriteTextSmallGroupsAndGrammar(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q in\n%s", want, out)
 		}
+	}
+}
+
+func lines(g Group) string {
+	var out []string
+	for _, d := range g.Drift {
+		out = append(out, d.Line())
+	}
+	return strings.Join(out, "\n")
+}
+
+func TestAbsentIsNeverMasked(t *testing.T) {
+	plain := "exporters: {otlp: {endpoint: x}}\n"
+	withHeader := "exporters: {otlp: {endpoint: x, headers: {authorization: secret}}}\n"
+	g := Analyze([]GroupInput{{Name: "all", Targets: []Target{target(t, "a", plain), target(t, "b", plain), target(t, "c", withHeader)}}}, Options{}).Groups[0]
+	if got := lines(g); strings.Contains(got, "****") || strings.Contains(got, "secret") {
+		t.Errorf("a missing value must read as missing, and a secret must stay hidden:\n%s", got)
+	}
+}
+
+func TestOnlyInPhrasing(t *testing.T) {
+	base := "receivers: {otlp: {}}\nservice: {pipelines: {logs: {receivers: [otlp]}}}\n"
+	extra := "receivers: {otlp: {}, filelog: {include: [/var/log/*.log]}}\nservice: {pipelines: {logs: {receivers: [otlp, filelog]}}}\n"
+	g := Analyze([]GroupInput{{Name: "all", Targets: []Target{target(t, "a", base), target(t, "b", base), target(t, "c", extra)}}}, Options{}).Groups[0]
+	got := lines(g)
+	if want := "receivers.filelog: only in c (2/3 targets don't have it) (also added to pipelines logs)"; got != want {
+		t.Errorf("one extra component must be one line\ngot  %q\nwant %q", got, want)
+	}
+}
+
+func TestOnlyInShowsValue(t *testing.T) {
+	a := "service: {telemetry: {logs: {level: info}}}\n"
+	c := "service: {telemetry: {logs: {level: info, encoding: json}}}\n"
+	g := Analyze([]GroupInput{{Name: "all", Targets: []Target{target(t, "a", a), target(t, "b", a), target(t, "c", c)}}}, Options{}).Groups[0]
+	if want := "service.telemetry.logs.encoding: only in c = json (2/3 targets don't have it)"; lines(g) != want {
+		t.Errorf("got %q want %q", lines(g), want)
+	}
+}
+
+func TestWriteTextSummarizesOddTarget(t *testing.T) {
+	odd := "receivers: {k8sobjects: {}}\nprocessors: {k8sattributes: {}}\nexporters: {otlp: {endpoint: x}}\nextensions: {pprof: {}}\nconnectors: {count: {}}\nservice: {telemetry: {logs: {level: debug}}}\n"
+	var buf bytes.Buffer
+	Analyze([]GroupInput{{Name: "all", Targets: []Target{target(t, "a", cfgA), target(t, "b", cfgA), target(t, "c", cfgA), target(t, "odd", odd)}}}, Options{}).WriteText(&buf)
+	out := buf.String()
+	if !strings.Contains(out, "odd: differs from the group in ") || strings.Contains(out, "missing in odd") {
+		t.Errorf("a target that is the lone outlier on many lines must be summarized once:\n%s", out)
 	}
 }

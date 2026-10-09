@@ -53,6 +53,17 @@ Target names are short (`team-c-opentelemetry-collector`, `obs-gateway-us`); `--
 3. **Groups of two never show drift** — the group header now says so and points at deviations.
 4. "1 targets" → "1 target".
 
+## Real-world configs: the Helm chart's own examples
+
+The 21 Collector configs rendered in `opentelemetry-helm-charts` (`charts/opentelemetry-collector/examples/*/rendered`), analyzed as two groups (7 DaemonSet agents, 14 Deployments/StatefulSets):
+
+- All 21 loaded, analyzed in under a second, round-tripped through `--emit-fleet` exactly, and `diff` was clean.
+- **Real upstream bug found:** the `kubernetesAttributes` example's traces pipeline uses a `resource` processor that is never defined. `otelcol-contrib` 0.161.0 rejects it (`references processor "resource" which is not configured`); otelkit's own check flagged it too. Still present on upstream `main` (last changed 2026-10-05).
+- One false validation failure: `hostmetrics root_path is supported on linux only`, because validation ran on macOS. Run `build` in Linux CI.
+- The first pass printed 46 drift lines, several showing `****` for a value that was simply missing. After the fixes below: **28 lines, no misleading masks.** These examples differ on purpose, so most remaining lines are intended features; on a real fleet, mark known variants with `--vary`.
+
+Noise fixes from this run: missing values are never masked; "6/7 use (absent)" now reads "only in X"; an added component folds its pipeline-list changes into one line ("also added to pipelines …"); a target that is the lone outlier on 5+ lines is summarized as "X: differs from the group in N settings" (JSON keeps every line).
+
 ## Not covered
 
 EKS/GKE/AKS auth plugins and large clusters (only kind); DaemonSet-mode Helm charts (ConfigMap name `-agent`); Operator v1alpha1 CRs with string `spec.config`; Grafana Alloy (out of scope for v1).

@@ -13,6 +13,20 @@ import (
 // Line renders a drift finding in one line.
 func (d Drift) Line() string {
 	outs := slices.Sorted(maps.Keys(d.Outliers))
+	if d.Majority == Absent {
+		parts := make([]string, len(outs))
+		for i, n := range outs {
+			parts[i] = n
+			if v := d.Outliers[n]; v != diff.Present {
+				parts[i] += " = " + v
+			}
+		}
+		line := fmt.Sprintf("%s: only in %s (%d/%d targets don't have it)", d.Path, strings.Join(parts, ", "), d.Agree, d.Total)
+		if len(d.AlsoInPipelines) > 0 {
+			line += " (also added to pipelines " + strings.Join(d.AlsoInPipelines, ", ") + ")"
+		}
+		return line
+	}
 	if d.Majority == diff.Present {
 		line := fmt.Sprintf("%s: present in %d/%d targets, missing in %s", d.Path, d.Agree, d.Total, strings.Join(outs, ", "))
 		if len(d.AlsoInPipelines) > 0 {
@@ -40,9 +54,10 @@ func (r Report) WriteText(w io.Writer) {
 			fmt.Fprintln(w, "  note: drift needs a majority (3+ targets); see deviations below")
 		}
 		fmt.Fprintln(w)
-		fmt.Fprintf(w, "  likely drift (%d):\n", len(g.Drift))
-		for _, d := range g.Drift {
-			fmt.Fprintf(w, "    %s\n", d.Line())
+		lines := driftLines(g)
+		fmt.Fprintf(w, "  likely drift (%d):\n", len(lines))
+		for _, l := range lines {
+			fmt.Fprintf(w, "    %s\n", l)
 		}
 		fmt.Fprintf(w, "\n  base (%d settings):\n", len(g.Base))
 		writeMap(w, "    ", g.Base)
@@ -59,6 +74,37 @@ func (r Report) WriteText(w io.Writer) {
 		fmt.Fprintf(w, "cross-group base (%d settings):\n", len(r.CrossBase))
 		writeMap(w, "  ", r.CrossBase)
 	}
+}
+
+// loneOutlierSummary is how many lines a target may be the only outlier on before the
+// text report summarizes them as one; JSON output keeps every line.
+const loneOutlierSummary = 5
+
+// driftLines renders drift, collapsing a target that is the lone outlier on many lines into one line.
+func driftLines(g Group) []string {
+	lone := map[string]int{}
+	for _, d := range g.Drift {
+		if len(d.Outliers) == 1 {
+			for n := range d.Outliers {
+				lone[n]++
+			}
+		}
+	}
+	var out []string
+	for _, d := range g.Drift {
+		if len(d.Outliers) == 1 {
+			if n := slices.Collect(maps.Keys(d.Outliers))[0]; lone[n] >= loneOutlierSummary {
+				continue
+			}
+		}
+		out = append(out, d.Line())
+	}
+	for _, n := range g.Targets {
+		if lone[n] >= loneOutlierSummary {
+			out = append(out, fmt.Sprintf("%s: differs from the group in %d settings (see deviations below)", n, lone[n]))
+		}
+	}
+	return out
 }
 
 func writeMap(w io.Writer, indent string, m map[string]string) {
