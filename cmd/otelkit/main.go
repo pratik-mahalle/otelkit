@@ -13,7 +13,7 @@ import (
 const usage = `usage: otelkit fleet <command> [flags] [args]
 
 commands:
-  analyze [--group name=<source>]... [--name alias=<source>]... [--vary <glob>]... [--format text|json] [--fail-on-drift] [--emit-fleet <dir>] <source>...
+  analyze [-c .otelkit.yaml] [--group name=<source>]... [--name alias=<source>]... [--vary <glob>]... [--format text|json] [--fail-on-drift] [--emit-fleet <dir>] <source>...
   build   [-f fleet.yaml] [--target name]... [--check] [--require-validate] [--otelcol <path>]
   diff    [-f fleet.yaml] [--target name]... [--format text|json] [--fail-on-diff]
 

@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"maps"
 	"slices"
 	"strings"
 
@@ -22,7 +23,17 @@ func runAnalyze(args []string, stdout, stderr io.Writer) int {
 	format := fs.String("format", "text", "text or json")
 	failOnDrift := fs.Bool("fail-on-drift", false, "exit 1 when drift is found")
 	emit := fs.String("emit-fleet", "", "write a fleet that reproduces the inputs into this empty dir")
+	cfgPath := fs.String("c", "", "config file with groups, names and vary (default .otelkit.yaml if present)")
 	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	path := *cfgPath
+	if path == "" {
+		path = ".otelkit.yaml"
+	}
+	cfg, err := loadConfig(path, *cfgPath != "")
+	if err != nil {
+		fmt.Fprintln(stderr, "error:", err)
 		return 2
 	}
 
@@ -35,6 +46,11 @@ func runAnalyze(args []string, stdout, stderr io.Writer) int {
 		groupOf[src] = group
 		if !slices.Contains(order, group) {
 			order = append(order, group)
+		}
+	}
+	for _, name := range slices.Sorted(maps.Keys(cfg.Groups)) {
+		for _, src := range cfg.Groups[name] {
+			add(name, src)
 		}
 	}
 	for _, g := range groups {
@@ -55,6 +71,9 @@ func runAnalyze(args []string, stdout, stderr io.Writer) int {
 
 	l := loader
 	l.Aliases = map[string]string{}
+	for name, src := range cfg.Names {
+		l.Aliases[src] = name
+	}
 	for _, a := range aliases {
 		name, src, ok := strings.Cut(a, "=")
 		if !ok {
@@ -84,7 +103,7 @@ func runAnalyze(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 
-	rep := analyze.Analyze(inputs, analyze.Options{Vary: vary})
+	rep := analyze.Analyze(inputs, analyze.Options{Vary: append(cfg.Vary, vary...)})
 	if *format == "json" {
 		enc := json.NewEncoder(stdout)
 		enc.SetIndent("", "  ")

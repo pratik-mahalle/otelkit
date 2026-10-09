@@ -124,3 +124,39 @@ func TestAnalyzeNameFlag(t *testing.T) {
 		t.Errorf("exit %d stderr %q:\n%s", code, errOut, out)
 	}
 }
+
+func TestAnalyzeConfigFile(t *testing.T) {
+	src := configs(t)
+	dir := t.TempDir()
+	cfg := `groups:
+  vms:
+    - ` + src + `/a.yaml
+    - ` + src + `/b.yaml
+    - ` + src + `/c.yaml
+names:
+  edge-c: ` + src + `/c.yaml
+vary:
+  - processors.batch.*
+`
+	os.WriteFile(filepath.Join(dir, ".otelkit.yaml"), []byte(cfg), 0o644)
+	t.Chdir(dir)
+	code, out, errOut := call("fleet", "analyze")
+	if code != 0 || !strings.Contains(out, "group vms: 3 targets") || !strings.Contains(out, "missing in edge-c") {
+		t.Fatalf("exit %d stderr %q:\n%s", code, errOut, out)
+	}
+	if strings.Contains(out, "processors.batch.timeout:") {
+		t.Errorf("vary from the config file was ignored:\n%s", out)
+	}
+}
+
+func TestAnalyzeConfigFileRelativePathsAndTypos(t *testing.T) {
+	src := configs(t)
+	os.WriteFile(filepath.Join(src, "otelkit.yaml"), []byte("groups:\n  vms: [a.yaml, b.yaml, c.yaml]\n"), 0o644)
+	if code, out, errOut := call("fleet", "analyze", "-c", filepath.Join(src, "otelkit.yaml")); code != 0 || !strings.Contains(out, "group vms: 3 targets") {
+		t.Fatalf("paths must resolve from the config file's folder; exit %d %q\n%s", code, errOut, out)
+	}
+	os.WriteFile(filepath.Join(src, "bad.yaml"), []byte("group:\n  vms: [a.yaml]\n"), 0o644)
+	if code, _, errOut := call("fleet", "analyze", "-c", filepath.Join(src, "bad.yaml")); code != 2 || !strings.Contains(errOut, "group") {
+		t.Errorf("a typo in the config file must fail loudly; exit %d %q", code, errOut)
+	}
+}
