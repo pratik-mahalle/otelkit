@@ -55,3 +55,7 @@ replaces a list; `${var:name}` comes from the target's `vars`; `${env:...}`/`${f
 (so a change to `fleet.yaml` can never make CI execute a script from the repo).
 
 Flags go before sources. Design: `docs/superpowers/specs/2026-10-08-otelkit-fleet-design.md`.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
