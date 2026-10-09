@@ -3,7 +3,9 @@
 Keep OpenTelemetry Collector configs consistent across Kubernetes clusters and VMs.
 
 ```bash
-go install github.com/pratik-mahalle/otelkit/cmd/otelkit@latest
+brew install pratik-mahalle/tap/otelkit
+# or download a binary for Linux, macOS or Windows from GitHub Releases
+# or: go install github.com/pratik-mahalle/otelkit/cmd/otelkit@latest
 ```
 
 ## 1. See how your configs drift
