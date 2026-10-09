@@ -160,3 +160,10 @@ func TestAnalyzeConfigFileRelativePathsAndTypos(t *testing.T) {
 		t.Errorf("a typo in the config file must fail loudly; exit %d %q", code, errOut)
 	}
 }
+
+func TestVersion(t *testing.T) {
+	version = "1.2.3"
+	if code, out, _ := call("version"); code != 0 || out != "otelkit 1.2.3\n" {
+		t.Errorf("exit %d, out %q", code, out)
+	}
+}

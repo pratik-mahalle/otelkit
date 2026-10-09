@@ -11,6 +11,7 @@ import (
 )
 
 const usage = `usage: otelkit fleet <command> [flags] [args]
+       otelkit version
 
 commands:
   analyze [-c .otelkit.yaml] [--group name=<source>]... [--name alias=<source>]... [--vary <glob>]... [--format text|json] [--fail-on-drift] [--emit-fleet <dir>] <source>...
@@ -22,9 +23,16 @@ or k8s://<context>/<namespace>/otelcol/<name>. Flags must come before sources.`
 
 var loader = source.Loader{Clients: source.DefaultClients}
 
+// version is set at release time with -ldflags "-X main.version=...".
+var version = "dev"
+
 func main() { os.Exit(run(os.Args[1:], os.Stdout, os.Stderr)) }
 
 func run(args []string, stdout, stderr io.Writer) int {
+	if len(args) == 1 && (args[0] == "version" || args[0] == "--version") {
+		fmt.Fprintf(stdout, "otelkit %s\n", version)
+		return 0
+	}
 	if len(args) < 2 || args[0] != "fleet" {
 		fmt.Fprintln(stderr, usage)
 		return 2
